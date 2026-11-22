@@ -1,7 +1,8 @@
 # AirAware — Winter Smog Navigation & Clean Air Action Platform
+**Breathe smarter. Live better.**
 
-> **PromptWars Virtual | Main Challenge 06**  
-> *A deployment-ready, full-stack platform empowering families, daily commuters, and urban communities to navigate hazardous winter smog with evidence-based interventions and low-emission routines.*
+> **PromptWars Virtual | Main Challenge 06 (Days 1 – 6 Complete)**  
+> *A deployment-ready, full-stack platform empowering families, daily commuters, and urban communities to navigate severe winter smog with personalized routines, indoor air protection, sustainable swaps, verified impact tracking, and hybrid Gemini AI intelligence.*
 
 ---
 
@@ -9,264 +10,214 @@
 
 During winter months across smog-prone metropolitan basins, nocturnal thermal radiation inversions trap vehicle exhaust, biomass smoke, and industrial particulate matter in the lowest 50–100 meters of the atmosphere. Ambient PM2.5 concentrations routinely spike to hazardous levels (US AQI > 200–400+), presenting severe acute cardiovascular and respiratory health risks.
 
-**AirAware** goes far beyond a passive AQI scoreboard. It is a proactive clean-air navigation companion that:
-1. **Tracks Location-Specific Environmental Data:** Displays real-time **US AQI**, target pollutants (PM2.5, PM10, NO₂, SO₂, CO, O₃), and localized weather conditions with dynamic sensor units powered by Open-Meteo.
-2. **Warns Against Morning Inversion Traps:** Explains why early morning hours (6:00 AM – 9:30 AM) are the most toxic of the day and suggests rescheduling outdoor exertion.
-3. **Guides Low-Emission Daily Routines:** Delivers lifestyle-tailored schedules (Daily Commuter, Family with Kids, Remote Worker, Senior Citizens, General Resident) that minimize both personal exposure and community emissions.
-4. **Provides Evidence-Based Indoor Hacks:** Surfaces cost-effective interventions (DIY Corsi-Rosenthal HEPA box filters, damp microfiber mopping, draft-proofing seals, two-stage kitchen ventilation, plant realities).
-5. **Promotes Sustainable Alternatives:** Quantifies the direct emissions savings of replacing high-emission practices (open leaf burning, wood space heating, solo car commutes) with clean alternatives.
-6. **Quantifies Individual Impact:** Interactive calculator measuring weekly CO₂ savings, PM2.5 soot prevented, and personal lung exposure reduction percentage.
-7. **Rule-Based Clean Air Knowledge Assistant:** Provides verified, peer-reviewed environmental and health answers with complete transparency (*clearly labeled: AI Assistant coming in the next development phase*).
+**AirAware** is more than an AQI scoreboard. It is an intelligent clean-air navigation companion featuring:
+1. **Live Air Quality & 4-Day Trajectory (`/`)**: Displays real-time **US AQI**, target pollutants (PM2.5, PM10, NO₂, SO₂, CO, O₃), and localized weather conditions powered by Open-Meteo with dynamic units. Features a 4-day hourly trajectory chart (-2 past days, +2 forecast days) and thermal inversion alerts.
+2. **Personalized Daily Planner (`/planner`)**: Structures daily schedules across four time periods (Morning, Midday, Evening, Night) customized by commute, housing, family vulnerability, and physical activity habits. Features stable action IDs, checkbox persistence, variation-seeded regeneration, and one-click logging to the impact tracker.
+3. **Indoor Air Protection (`/indoor`)**: Actionable interventions categorized by economic cost (Free, Low-Cost, Equipment), outdoor-AQI contextual advice, and the 4 non-negotiable Golden Rules of indoor air.
+4. **Sustainable Living Alternatives (`/sustainable`)**: Conventional vs. clean lifestyle swaps (commute, heating, waste, household) with positive reinforcement and direct emissions reduction explanations.
+5. **Verified Impact Tracker (`/impact`)**: Rigorous count-based behavioral tracking with absolute scientific integrity (zero fabricated emission formulas). Strict separation between **Category A (Personal Exposure Reduction)** and **Category B (Environmental Contribution)**, 7-day activity chart rendered only when ≥ 2 distinct days of data exist, action log with delete/undo, and data-backed achievements.
+6. **AI Assistant (`/assistant`)**: Context-aware conversational assistant powered by Google's **Gemini 2.5 Flash** via the official `google-genai` SDK. Fully protected with prompt injection defenses, coordinate truncation, in-memory rate limiting, banned claims safety filtering, and honest source badging (`AI-generated` vs `Rule-based guidance`).
 
 ---
 
 ## 2. Tech Stack & Pinned Versions
 
 ### Frontend (`frontend/`)
-- **Runtime / Framework:** React 18.3.1, Vite 5.4.11
+- **Framework & Tooling:** React 18.3.1, Vite 5.4.11
 - **Language:** JavaScript (ES Modules, strictly no TypeScript)
-- **Styling:** Tailwind CSS 3.4.17 + PostCSS 8.4.49 + Autoprefixer 10.4.20 (Tailwind v3, not v4)
+- **Styling:** Tailwind CSS 3.4.17 + PostCSS 8.4.49 + Autoprefixer 10.4.20 (Tailwind v3)
 - **Icons:** `lucide-react` 0.344.0
-- **Data Visualization:** `recharts` 2.12.7 (4-day hourly trajectory area charts with EPA breakpoints)
-- **Zero other UI component libraries** to keep bundles lean, reliable, and performant.
+- **Data Visualization:** `recharts` 2.12.7 (Responsive hourly trajectory and 7-day activity bar charts)
+- **State & Storage:** Client-side `StorageAdapter` with `localStorage` and in-memory fallback
+- **Testing:** `vitest` 2.1.8, `@testing-library/react` 16.1.0, `jsdom` 25.0.1
 
 ### Backend (`backend/`)
 - **Runtime:** Python 3.11+
 - **Web Framework:** FastAPI 0.115.6, Uvicorn 0.34.0
 - **Validation & Settings:** Pydantic v2 (2.10.4), Pydantic Settings (2.7.0)
-- **HTTP Client:** `httpx` (0.28.1, fully async)
-- **Testing:** `pytest` (8.3.4), `pytest-asyncio` (0.25.0), `respx` (0.22.0 for mock verification)
-- **Persistence:** None required for MVP. Documented architecture ready for future PostgreSQL / SQLite persistence.
+- **HTTP Client:** `httpx` 0.28.1 (fully async)
+- **AI SDK:** `google-genai` 3.6.1 (modern Google GenAI SDK, async client)
+- **Testing:** `pytest` 8.3.4, `pytest-asyncio` 0.25.0, `respx` 0.22.0
 
 ---
 
-## 3. Data Providers & Standards
+## 3. Architecture & Key Decisions
 
-- **Air Quality API:** `https://air-quality-api.open-meteo.com/v1/air-quality`
-  - Parameters: `latitude`, `longitude`, `current=us_aqi,european_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone`, `hourly=us_aqi,pm2_5`, `past_days=2&forecast_days=2`, `timezone=auto`.
-  - Units are dynamically parsed from `current_units` and `hourly_units`; never hardcoded.
-  - Nulls are treated as `"unavailable"` and never rendered as `0`.
-- **Weather API:** `https://api.open-meteo.com/v1/forecast`
-  - Parameters: `latitude`, `longitude`, `current=temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,precipitation,weather_code,is_day`, `timezone=auto`.
-  - WMO Weather Codes are mapped deterministically via `app/utils/weather.py`.
-- **Geocoding API:** `https://geocoding-api.open-meteo.com/v1/search`
-  - Gracefully handles missing `results` keys when queries yield zero matches.
-- **Attribution & Terms:**
-  - Air quality and meteorological data are provided by [Open-Meteo](https://open-meteo.com/) under the [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/) license.
-  - *Open-Meteo's free API tier is strictly for non-commercial use. Commercial deployments require an Open-Meteo commercial plan with proper attribution.*
+### 3.1 Stateless Backend & Browser Persistence
+Render free tier instances run on ephemeral filesystems and lack user authentication. Storing user profiles and action logs in a central server database would cause data loss upon container restart and leak or mix unauthenticated users' private lifestyle data.
+- **Client Storage (`frontend/src/storage/`)**: User profiles, planner completion states, and action logs are stored strictly on the client using a versioned schema, automated 31-day data pruning, and an in-memory fallback.
+- **Stateless Endpoints**: The backend accepts profile payloads on each request, performs validation and normalization, and returns personalized results without server-side database writes.
 
----
+### 3.2 Deterministic Safety Ownership & Honest AI Badging
+- The deterministic backend layer exclusively owns US AQI calculation, standard breakpoint interpretations, severity tokens, and life-critical exposure safeguards (e.g. N95 respirator advice during hazardous smog).
+- When Gemini AI is enabled and configured, AI recommendations are merged such that **critical deterministic items are always placed first and cannot be overridden or downgraded**.
+- Every response metadata contains `source: "ai" | "rules"` and `fallback_reason`. The UI honestly badges responses as `AI-generated` or `Rule-based guidance` and never mislabels rule output as AI.
 
-## 4. US AQI Rules & Single Source of Truth
-
-- **Standard:** **US AQI (United States Environmental Protection Agency Breakpoints)** is the single primary displayed standard throughout the UI and backend logic.
-- **Centralized Engine:** Thresholds are centralized in **one single module**: `backend/app/utils/aqi.py`.
-  - `0 – 50`: **Good** (`good`, green)
-  - `51 – 100`: **Moderate** (`moderate`, yellow)
-  - `101 – 150`: **Unhealthy for Sensitive Groups** (`sensitive_unhealthy`, orange)
-  - `151 – 200`: **Unhealthy** (`unhealthy`, red)
-  - `201 – 300`: **Very Unhealthy** (`very_unhealthy`, purple)
-  - `301+`: **Hazardous** (`hazardous`, maroon)
-  - `None / Invalid`: **Unavailable** (`unavailable`, gray)
-- **Decoupled Architecture:** The backend computes and returns the interpretation (`category`, `severity_key`, `color_token`, `guidance`). The frontend strictly maps `severity_key` to Tailwind CSS styles via `frontend/src/utils/severity.js`. **No numerical AQI thresholds are duplicated on the frontend.**
+### 3.3 Authentic Impact Tracking (Zero Fabricated Metrics)
+- Atmospheric exposure and carbon savings depend on complex micro-environmental air exchanges, fuel types, and traffic cycles.
+- AirAware **refuses to fabricate synthetic "kg CO2 saved" or "PM2.5 prevented" numbers**. Instead, it tracks verified user-logged action counts across Category A (Exposure Reduction) and Category B (Environmental Contribution).
 
 ---
 
-## 5. Project Directory Structure
+## 4. Directory Structure
 
-```text
+```
 AirAware/
-├── backend/
+├── .env.example                  # Root environment variable template
+├── docker-compose.yml            # Multi-container orchestration (frontend + backend)
+├── render.yaml                   # Render deployment blueprint for backend
+├── vercel.json                   # Vercel SPA deployment configuration
+├── README.md                     # Comprehensive documentation
+├── docs/                         # Architectural documentation
+│   ├── AI_ARCHITECTURE.md        # Gemini integration, safety filters & fallback
+│   ├── PERSONALIZATION.md        # Profile schema, lifestyle enums & planner
+│   ├── IMPACT_METHODOLOGY.md     # Count-based metrics & Category A/B rationale
+│   └── deployment.md             # Vercel & Render step-by-step production deployment
+├── scripts/
+│   └── smoke_test.py             # Automated end-to-end API smoke test suite
+├── backend/                      # FastAPI Python Application
+│   ├── requirements.txt          # Production dependencies
+│   ├── requirements-dev.txt      # Testing & development dependencies
+│   ├── Dockerfile                # Production container specification
 │   ├── app/
-│   │   ├── __init__.py
-│   │   ├── main.py                     # FastAPI application factory & routes
-│   │   ├── config.py                   # Pydantic Settings configuration
-│   │   ├── routers/
-│   │   │   ├── __init__.py
-│   │   │   ├── aqi.py                  # GET /api/air-quality
-│   │   │   ├── geocoding.py            # GET /api/geocoding/search
-│   │   │   ├── routines.py             # GET /api/routines
-│   │   │   ├── hacks.py                # GET /api/hacks
-│   │   │   ├── alternatives.py         # GET /api/alternatives
-│   │   │   ├── impact.py               # POST /api/impact/calculate
-│   │   │   └── assistant.py            # POST /api/assistant/query
-│   │   ├── services/
-│   │   │   ├── __init__.py
-│   │   │   ├── open_meteo.py           # Async Open-Meteo client & parser
-│   │   │   ├── recommendations.py      # Routines, hacks, alternatives & impact math
-│   │   │   └── rule_assistant.py       # Rule-based clean air knowledge engine
-│   │   ├── schemas/
-│   │   │   ├── __init__.py
-│   │   │   ├── aqi.py                  # Pydantic models for AQI, weather & trends
-│   │   │   ├── geocoding.py            # Geocoding search models
-│   │   │   ├── routines.py             # Lifestyle routine schemas
-│   │   │   ├── hacks.py                # Indoor hack schemas
-│   │   │   ├── alternatives.py         # Sustainable alternative schemas
-│   │   │   ├── impact.py               # Impact calculator schemas
-│   │   │   └── assistant.py            # Assistant query & response schemas
-│   │   └── utils/
-│   │       ├── __init__.py
-│   │       ├── aqi.py                  # Centralized US AQI thresholds & guidance
-│   │       └── weather.py              # WMO weather code interpreter
-│   ├── tests/
-│   │   ├── __init__.py
-│   │   ├── conftest.py                 # Pytest fixtures & sys.path setup
-│   │   ├── test_aqi_utils.py           # Threshold boundary & null handling tests
-│   │   ├── test_weather_utils.py       # WMO code translation & day/night tests
-│   │   ├── test_open_meteo_service.py  # Respx-mocked external API tests
-│   │   ├── test_recommendations.py     # Routine & impact calculation tests
-│   │   └── test_api_endpoints.py       # Full FastAPI endpoint integration tests
-│   ├── requirements.txt                # Pinned production dependencies
-│   ├── requirements-dev.txt            # Pinned test & development dependencies
-│   └── Dockerfile                      # Python 3.11 slim containerfile
-│
-├── frontend/
-│   ├── public/
-│   ├── src/
-│   │   ├── api/
-│   │   │   └── client.js               # Clean async API client
-│   │   ├── components/
-│   │   │   ├── Navbar.jsx              # Responsive header, logo & tab navigation
-│   │   │   ├── Footer.jsx              # CC BY 4.0 attribution & medical disclaimer
-│   │   │   ├── LocationSearch.jsx      # Debounced geocoding search + presets + GPS
-│   │   │   ├── AQIBadge.jsx            # Prominent US AQI badge & advisory chips
-│   │   │   ├── WeatherWidget.jsx       # Local temperature, humidity, wind & icons
-│   │   │   ├── PollutantGrid.jsx       # Dynamic sensor cards with API units
-│   │   │   └── AQITrendChart.jsx       # Recharts 4-day hourly trajectory chart
-│   │   ├── pages/
-│   │   │   ├── DashboardPage.jsx       # Real-time smog monitor & quick actions
-│   │   │   ├── RoutinesPage.jsx        # 5 lifestyle-tailored low-emission schedules
-│   │   │   ├── HacksPage.jsx           # Evidence-based indoor clean air hacks
-│   │   │   ├── AlternativesPage.jsx    # Comparative sustainable swaps
-│   │   │   ├── ImpactPage.jsx          # Interactive stewardship calculator
-│   │   │   └── AssistantPage.jsx       # Labeled rule-based clean air assistant
-│   │   ├── utils/
-│   │   │   └── severity.js             # Single severity-to-Tailwind style mapper
-│   │   ├── App.jsx                     # Top-level state & layout controller
-│   │   ├── index.css                   # Tailwind v3 directives & custom scrollbars
-│   │   └── main.jsx                    # React 18 DOM mount
-│   ├── index.html
-│   ├── package.json                    # Pinned frontend dependencies
-│   ├── postcss.config.js
-│   ├── tailwind.config.js              # Tailwind v3 configuration
-│   ├── vite.config.js                  # Vite 5 configuration with proxy
-│   ├── nginx.conf                      # Production SPA routing & API proxy
-│   └── Dockerfile                      # Multi-stage production containerfile
-│
-├── docker-compose.yml                  # Full-stack container orchestration
-└── README.md                           # Documentation & architecture guide
+│   │   ├── config.py             # Pydantic v2 settings & AI configuration
+│   │   ├── main.py               # FastAPI entrypoint & router aggregation
+│   │   ├── ai/                   # Gemini AI Subsystem
+│   │   │   ├── context_builder.py# PII stripping & coordinate truncation
+│   │   │   ├── prompt_builder.py # System instructions & XML delimiter isolation
+│   │   │   ├── validator.py      # Banned claims & safety filter
+│   │   │   └── service.py        # Async client, caching & rate limiting
+│   │   ├── routers/              # API route definitions
+│   │   │   ├── aqi.py            # /api/air-quality
+│   │   │   ├── geocoding.py      # /api/geocoding/search
+│   │   │   ├── profile.py        # /api/profile/validate
+│   │   │   ├── planner.py        # /api/plan/daily
+│   │   │   ├── indoor.py         # /api/indoor/tips
+│   │   │   ├── sustainable.py    # /api/sustainable/recommendations
+│   │   │   ├── impact.py         # /api/impact/catalog & /api/impact/summary
+│   │   │   └── ai.py             # /api/ai/chat & /api/ai/recommendations
+│   │   ├── schemas/              # Pydantic request & response models
+│   │   ├── services/             # Recommendation providers & open-meteo integration
+│   │   └── utils/                # AQI breakpoints & weather code mappings
+│   └── tests/                    # 51 unit & integration pytest tests
+└── frontend/                     # React 18 + Vite SPA
+    ├── package.json              # Pinned npm dependencies
+    ├── vite.config.js            # Vite build configuration & test setup
+    ├── tailwind.config.js        # Tailwind CSS v3 configuration
+    ├── Dockerfile & nginx.conf   # Production static frontend container
+    ├── src/
+    │   ├── storage/              # Client-side StorageAdapter & localStorage engine
+    │   ├── hooks/                # useProfile, usePlan, useImpact, useChat
+    │   ├── components/           # Navbar, Footer, LocationSearch, AQIBadge, etc.
+    │   ├── pages/                # Dashboard, DailyPlan, IndoorAir, Sustainable, Impact, AI
+    │   └── test/                 # 14 Vitest component & storage unit tests
 ```
 
 ---
 
-## 6. Getting Started Locally
+## 5. API Reference
 
-### Prerequisites
-- **Python 3.11+** installed
-- **Node.js 18+ / 20+** and `npm` installed
+| Method | Endpoint | Description |
+| :--- | :--- | :--- |
+| `GET` | `/api/health` | Health check returning status and AI availability metadata. |
+| `GET` | `/api/air-quality` | Real-time US AQI, target pollutants, weather, and 4-day trajectory. |
+| `GET` | `/api/geocoding/search` | Location search with Open-Meteo geocoding. |
+| `POST` | `/api/profile/validate` | Validates, normalizes, and sanitizes user profile without server persistence. |
+| `POST` | `/api/plan/daily` | Generates 4-period personalized schedule with stable 12-char hex IDs. |
+| `GET` | `/api/indoor/tips` | Free, Low-Cost, and Equipment indoor air quality interventions. |
+| `GET` | `/api/sustainable/recommendations` | Practical non-judgmental clean lifestyle alternatives. |
+| `GET` | `/api/impact/catalog` | Master definitions for Category A and Category B actions. |
+| `POST` | `/api/impact/summary` | Stateless calculation of daily counts, category breakdowns, and achievements. |
+| `POST` | `/api/ai/chat` | Safe conversational clean air assistant with prompt injection defenses. |
+| `POST` | `/api/ai/recommendations` | Context-aware recommendations merging Gemini Flash with deterministic safeguards. |
 
-### Step 1: Clone or Navigate to the Workspace
+---
+
+## 6. Quickstart & Local Setup
+
+### 6.1 Prerequisites
+- Python 3.11+
+- Node.js 18+ (tested on Node 20 / 22 / 26)
+- Git
+
+### 6.2 Backend Setup
 ```powershell
-cd d:\Projects\AirAware
-```
-
-### Step 2: Set Up Backend
-```powershell
-# Navigate to backend
+# Navigate to backend directory
 cd backend
 
-# (Optional) Create and activate virtual environment
+# Create and activate virtual environment
 python -m venv venv
-.\venv\Scripts\Activate.ps1   # On Windows PowerShell
-# source venv/bin/activate    # On Linux / macOS
+.\venv\Scripts\Activate.ps1   # On Linux/macOS: source venv/bin/activate
 
-# Install dependencies
-python -m pip install -r requirements.txt
-python -m pip install -r requirements-dev.txt
+# Install pinned dependencies
+pip install -r requirements.txt -r requirements-dev.txt
 
-# Run the FastAPI development server
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+# Copy environment variables (optional: add your GEMINI_API_KEY)
+copy .env.example .env
+
+# Start FastAPI development server
+uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
 ```
-The backend API is now running at `http://127.0.0.1:8000`.  
-Interactive Swagger docs: `http://127.0.0.1:8000/docs`.
+Backend API will be running at `http://127.0.0.1:8000`. Interactive documentation is available at `http://127.0.0.1:8000/docs`.
 
-### Step 3: Set Up Frontend
-Open a second PowerShell window:
+### 6.3 Frontend Setup
 ```powershell
-cd d:\Projects\AirAware\frontend
+# Open a new terminal in frontend directory
+cd frontend
 
-# Install dependencies
+# Install pinned dependencies
 npm install
 
-# Start the Vite development server
+# Start Vite development server
 npm run dev
 ```
-The frontend application will be live at `http://localhost:3000`.
+Frontend application will be accessible at `http://localhost:5173`.
+
+### 6.4 Docker Compose Setup
+Run both frontend and backend in production-mirrored containers:
+```powershell
+docker-compose up --build
+```
+- Frontend UI: `http://localhost:3000`
+- Backend API: `http://localhost:8000`
 
 ---
 
-## 7. Running the Verification Test Suites
+## 7. Testing & Verification
 
-### Backend Unit & Integration Tests (Pytest + Respx)
-The backend test suite executes 28 comprehensive automated tests covering threshold boundaries, null values, geocoding absence, and mock endpoints:
+### 7.1 Backend Tests (Pytest)
+AirAware features 51 unit and integration tests covering AQI thresholds, Open-Meteo parsing, stateless profile validation, daily planner generation, impact summaries, AI context building, prompt injection defense, rate limiting, and rule fallback:
 ```powershell
 python -m pytest backend/tests -v
 ```
-*Expected Result: 28 passed.*
 
-### Frontend Production Build Verification
-Verify that Vite compile, asset bundling, and PostCSS / Tailwind processing pass cleanly without syntax errors:
+### 7.2 Frontend Tests (Vitest)
+Unit and component tests verify localStorage recovery, corrupt JSON healing, anti-double-tap protection, 31-day pruning, profile resets, planner state persistence, and chat message rendering:
+```powershell
+npm test --prefix frontend -- --run
+```
+
+### 7.3 Production Build
+Verify Vite bundles production assets cleanly with zero errors:
 ```powershell
 npm run build --prefix frontend
 ```
-*Expected Result: Production bundle generated cleanly in `frontend/dist/`.*
 
----
-
-## 8. Docker Deployment
-
-Deploy the entire stack with a single command via Docker Compose:
-
-```bash
-docker compose up --build -d
-```
-
-- **Frontend:** `http://localhost:3000` (Nginx serving SPA and proxying `/api/`)
-- **Backend API:** `http://localhost:8000/api/`
-- **Swagger Docs:** `http://localhost:8000/docs`
-
-To tear down:
-```bash
-docker compose down
+### 7.4 Automated Smoke Test Suite
+Run end-to-end verification against a running server:
+```powershell
+python scripts/smoke_test.py --base-url http://localhost:8000
 ```
 
 ---
 
-## 9. API Reference
+## 8. Deployment
 
-| Method | Endpoint | Description |
-|---|---|---|
-| `GET` | `/` | API status and Open-Meteo license attribution. |
-| `GET` | `/api/health` | Service health status. |
-| `GET` | `/api/air-quality?latitude=28.61&longitude=77.20&city=Delhi` | Fetches real-time US AQI, pollutants, weather & 4-day hourly trend data. |
-| `GET` | `/api/geocoding/search?name=Delhi&count=5` | Searches locations worldwide (safely returns `[]` when not found). |
-| `GET` | `/api/routines?aqi=180&lifestyle=commuter` | Lifestyle-tailored low-emission routine with inversion advisory. |
-| `GET` | `/api/hacks?aqi=210` | Evidence-based indoor clean air hacks & golden rules. |
-| `GET` | `/api/alternatives` | Curated catalog of sustainable winter swaps and avoided emissions. |
-| `POST` | `/api/impact/calculate` | Computes weekly CO₂ savings, PM2.5 prevented & personal exposure drop. |
-| `POST` | `/api/assistant/query` | Rule-based clean air knowledge assistant (*clearly labeled non-AI*). |
+- **Frontend on Vercel**: Ready for one-click deployment with `vercel.json` and automatic client-side SPA routing rewrites.
+- **Backend on Render**: Declarative `render.yaml` blueprint with health check at `/api/health`, environment variable bindings, and safe non-synced `GEMINI_API_KEY`.
+- For detailed deployment steps, environment tables, and rollback playbooks, see [`docs/deployment.md`](docs/deployment.md).
 
 ---
 
-## 10. Roadmap & Future Phases
-
-- **Phase 4 (Persistence):** PostgreSQL with SQLAlchemy / Alembic migrations to store user preferences, saved locations, and historical impact tracking.
-- **Phase 5 (GenAI Integration):** Secure integration of Google Gemini API for natural-language multi-turn smog advisory dialogues once authorized.
-- **Phase 6 (IoT Sensors):** Webhook support for personal indoor air monitors (PurpleAir, Sensirion, AirVisual).
-
----
-
-## 11. License & Attribution
-
-- **AirAware Application Code:** Distributed under the MIT License.
-- **Data Provider Attribution:** Powered by [Open-Meteo](https://open-meteo.com/) under the [CC BY 4.0 International](https://creativecommons.org/licenses/by/4.0/) license.
+## 9. Data Attribution
+Air quality, meteorological forecasts, and geocoding services are provided by the [Open-Meteo API](https://open-meteo.com/). Data is licensed under Creative Commons Attribution 4.0 International (CC BY 4.0).
