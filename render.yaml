@@ -12,14 +12,14 @@ services:
     envVars:
       - key: ENVIRONMENT
         value: production
-      - key: CORS_ORIGINS
-        value: '["*"]' # In production, restrict to your specific Vercel frontend URL
+      - key: ALLOWED_ORIGINS
+        value: '["https://airaware.vercel.app"]' # Replace with your deployed Vercel domain
       - key: AI_ENABLED
         value: "true"
       - key: GEMINI_MODEL
         value: "gemini-2.5-flash"
       - key: GEMINI_API_KEY
-        sync: false # Set via Render Dashboard - Secret Environment Variables
+        sync: false # Set securely in Render Dashboard (Secret Environment Variables)
       - key: RATE_LIMIT_PER_MINUTE
         value: "20"
       - key: AI_TIMEOUT_SECONDS

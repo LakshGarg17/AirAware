@@ -1,8 +1,8 @@
 # AirAware — Winter Smog Navigation & Clean Air Action Platform
 **Breathe smarter. Live better.**
 
-> **PromptWars Virtual | Main Challenge 06 (Days 1 – 6 Complete)**  
-> *A deployment-ready, full-stack platform empowering families, daily commuters, and urban communities to navigate severe winter smog with personalized routines, indoor air protection, sustainable swaps, verified impact tracking, and hybrid Gemini AI intelligence.*
+> **PromptWars Virtual | Main Challenge 06 (Days 1 – 7 Complete & Production Ready)**  
+> *A deployment-ready, full-stack platform empowering families, daily commuters, and urban communities to navigate severe winter smog with personalized routines, indoor air protection, sustainable swaps, verified impact tracking, hybrid Gemini AI intelligence, and audited security.*
 
 ---
 
@@ -186,7 +186,7 @@ docker-compose up --build
 ## 7. Testing & Verification
 
 ### 7.1 Backend Tests (Pytest)
-AirAware features 51 unit and integration tests covering AQI thresholds, Open-Meteo parsing, stateless profile validation, daily planner generation, impact summaries, AI context building, prompt injection defense, rate limiting, and rule fallback:
+AirAware features 58 unit and integration tests covering AQI thresholds, Open-Meteo parsing and caching, stateless profile validation, daily planner generation, impact summaries, AI context building, prompt injection defense, rate limiting, security headers, CORS origin enforcement, and rule fallback:
 ```powershell
 python -m pytest backend/tests -v
 ```
@@ -204,18 +204,18 @@ npm run build --prefix frontend
 ```
 
 ### 7.4 Automated Smoke Test Suite
-Run end-to-end verification against a running server:
+Run end-to-end verification against a running server across 3 operational modes (`normal`, `ai-disabled`, `invalid-key`):
 ```powershell
-python scripts/smoke_test.py --base-url http://localhost:8000
+python scripts/smoke_test.py --base-url http://localhost:8000 --mode normal
 ```
 
 ---
 
 ## 8. Deployment
 
-- **Frontend on Vercel**: Ready for one-click deployment with `vercel.json` and automatic client-side SPA routing rewrites.
+- **Frontend on Vercel**: Ready for one-click deployment with `vercel.json`, security headers (`X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`), and automatic client-side SPA routing rewrites.
 - **Backend on Render**: Declarative `render.yaml` blueprint with health check at `/api/health`, environment variable bindings, and safe non-synced `GEMINI_API_KEY`.
-- For detailed deployment steps, environment tables, and rollback playbooks, see [`docs/deployment.md`](docs/deployment.md).
+- For detailed deployment steps, environment tables, and rollback playbooks, see [`docs/DAY7_DEPLOYMENT_READINESS.md`](docs/DAY7_DEPLOYMENT_READINESS.md) and [`docs/DAY7_QA_REPORT.md`](docs/DAY7_QA_REPORT.md).
 
 ---
 
