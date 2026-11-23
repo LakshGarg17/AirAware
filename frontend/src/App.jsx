@@ -1,16 +1,18 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, lazy, Suspense } from 'react';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ProfileDrawer from './components/ProfileDrawer';
 import DashboardPage from './pages/DashboardPage';
-import DailyPlanPage from './pages/DailyPlanPage';
-import IndoorAirPage from './pages/IndoorAirPage';
-import SustainableLivingPage from './pages/SustainableLivingPage';
-import ImpactTrackerPage from './pages/ImpactTrackerPage';
-import AIAssistantPage from './pages/AIAssistantPage';
 import { fetchAirQuality } from './api/client';
 import { useProfile } from './hooks/useProfile';
 import { useImpact } from './hooks/useImpact';
+
+// Lazy-loaded tab views for optimized bundle splitting and faster initial load
+const DailyPlanPage = lazy(() => import('./pages/DailyPlanPage'));
+const IndoorAirPage = lazy(() => import('./pages/IndoorAirPage'));
+const SustainableLivingPage = lazy(() => import('./pages/SustainableLivingPage'));
+const ImpactTrackerPage = lazy(() => import('./pages/ImpactTrackerPage'));
+const AIAssistantPage = lazy(() => import('./pages/AIAssistantPage'));
 
 const DEFAULT_LOCATION = {
   name: 'Delhi, India',
@@ -78,52 +80,59 @@ export default function App() {
       />
 
       <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {activeTab === 'dashboard' && (
-          <DashboardPage
-            aqiData={aqiData}
-            currentLocation={currentLocation}
-            onLocationSelect={handleLocationSelect}
-            isLoading={isLoading}
-            error={error}
-            onNavigateTab={setActiveTab}
-            onOpenProfile={() => setIsProfileOpen(true)}
-            profile={profile}
-            onRetry={loadEnvironmentalData}
-          />
-        )}
+        <Suspense fallback={
+          <div className="py-20 text-center">
+            <div className="inline-block w-8 h-8 border-4 border-sky-500 border-t-transparent rounded-full animate-spin mb-3" />
+            <p className="text-slate-500 font-medium text-xs">Loading section...</p>
+          </div>
+        }>
+          {activeTab === 'dashboard' && (
+            <DashboardPage
+              aqiData={aqiData}
+              currentLocation={currentLocation}
+              onLocationSelect={handleLocationSelect}
+              isLoading={isLoading}
+              error={error}
+              onNavigateTab={setActiveTab}
+              onOpenProfile={() => setIsProfileOpen(true)}
+              profile={profile}
+              onRetry={loadEnvironmentalData}
+            />
+          )}
 
-        {activeTab === 'plan' && (
-          <DailyPlanPage 
-            latitude={currentLocation.latitude}
-            longitude={currentLocation.longitude}
-            profile={profile}
-            onQuickLogImpact={handleQuickLogImpact}
-          />
-        )}
+          {activeTab === 'plan' && (
+            <DailyPlanPage 
+              latitude={currentLocation.latitude}
+              longitude={currentLocation.longitude}
+              profile={profile}
+              onQuickLogImpact={handleQuickLogImpact}
+            />
+          )}
 
-        {activeTab === 'indoor' && (
-          <IndoorAirPage 
-            aqiData={aqiData} 
-          />
-        )}
+          {activeTab === 'indoor' && (
+            <IndoorAirPage 
+              aqiData={aqiData} 
+            />
+          )}
 
-        {activeTab === 'sustainable' && (
-          <SustainableLivingPage 
-            profile={profile}
-          />
-        )}
+          {activeTab === 'sustainable' && (
+            <SustainableLivingPage 
+              profile={profile}
+            />
+          )}
 
-        {activeTab === 'impact' && (
-          <ImpactTrackerPage />
-        )}
+          {activeTab === 'impact' && (
+            <ImpactTrackerPage />
+          )}
 
-        {activeTab === 'assistant' && (
-          <AIAssistantPage 
-            currentAqiData={aqiData}
-            currentLocation={currentLocation}
-            profile={profile}
-          />
-        )}
+          {activeTab === 'assistant' && (
+            <AIAssistantPage 
+              currentAqiData={aqiData}
+              currentLocation={currentLocation}
+              profile={profile}
+            />
+          )}
+        </Suspense>
       </main>
 
       {/* Profile Drawer */}

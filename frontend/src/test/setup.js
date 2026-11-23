@@ -35,4 +35,7 @@ if (typeof window !== 'undefined') {
       configurable: true,
     });
   }
+  if (window.HTMLElement && !window.HTMLElement.prototype.scrollIntoView) {
+    window.HTMLElement.prototype.scrollIntoView = () => {};
+  }
 }
