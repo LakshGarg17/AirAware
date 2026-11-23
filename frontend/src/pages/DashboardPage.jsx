@@ -17,7 +17,8 @@ export default function DashboardPage({
   error,
   onNavigateTab,
   onOpenProfile,
-  profile
+  profile,
+  onRetry
 }) {
   const [profileBannerDismissed, setProfileBannerDismissed] = useState(false);
 
@@ -77,11 +78,22 @@ export default function DashboardPage({
 
       {/* Error state */}
       {error && (
-        <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-2xl flex items-center space-x-3 text-xs">
-          <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
-          <div className="flex-1">
-            <strong>Unable to refresh air data:</strong> {error}
+        <div className="bg-rose-50 border border-rose-200 text-rose-800 p-4 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center space-x-3">
+            <AlertCircle className="w-5 h-5 text-rose-600 shrink-0" />
+            <div className="flex-1">
+              <strong>Unable to refresh air data:</strong> {error}
+            </div>
           </div>
+          {onRetry && (
+            <button
+              onClick={onRetry}
+              disabled={isLoading}
+              className="px-3.5 py-1.5 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white rounded-xl text-xs font-semibold shrink-0 transition-colors shadow-xs self-start sm:self-auto cursor-pointer"
+            >
+              {isLoading ? 'Retrying...' : 'Retry'}
+            </button>
+          )}
         </div>
       )}
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import ProfileDrawer from './components/ProfileDrawer';
@@ -32,36 +32,29 @@ export default function App() {
   // Hook for stateless impact tracking
   const { logAction } = useImpact();
 
+  // Load environmental data for the current location with error handling and retry support
+  const loadEnvironmentalData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const data = await fetchAirQuality(
+        currentLocation.latitude,
+        currentLocation.longitude,
+        currentLocation.name
+      );
+      setAqiData(data);
+    } catch (err) {
+      console.error('Failed to fetch air data:', err);
+      setError(err.message || 'Failed to load air quality data. Please check connection.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentLocation]);
+
   // Fetch air quality and weather data on location change
   useEffect(() => {
-    let isCurrent = true;
-    async function loadEnvironmentalData() {
-      setIsLoading(true);
-      setError(null);
-      try {
-        const data = await fetchAirQuality(
-          currentLocation.latitude,
-          currentLocation.longitude,
-          currentLocation.name
-        );
-        if (isCurrent) {
-          setAqiData(data);
-        }
-      } catch (err) {
-        console.error('Failed to fetch air data:', err);
-        if (isCurrent) {
-          setError(err.message || 'Failed to load air quality data. Please check connection.');
-        }
-      } finally {
-        if (isCurrent) {
-          setIsLoading(false);
-        }
-      }
-    }
-
     loadEnvironmentalData();
-    return () => { isCurrent = false; };
-  }, [currentLocation]);
+  }, [loadEnvironmentalData]);
 
   const handleLocationSelect = (loc) => {
     setCurrentLocation(loc);
@@ -95,6 +88,7 @@ export default function App() {
             onNavigateTab={setActiveTab}
             onOpenProfile={() => setIsProfileOpen(true)}
             profile={profile}
+            onRetry={loadEnvironmentalData}
           />
         )}
 
