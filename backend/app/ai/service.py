@@ -64,6 +64,10 @@ class AIService:
         self._rate_limits[client_ip] = recent
         return True
 
+    def reset_rate_limits(self):
+        """Clears in-memory rate limiter state (primarily for test resets)."""
+        self._rate_limits.clear()
+
     def _generate_cache_key(self, lat: float, lon: float, aqi_bucket: str, profile: Optional[Dict[str, Any]]) -> str:
         prof_str = json.dumps(profile or {}, sort_keys=True)
         prof_hash = hashlib.sha256(prof_str.encode()).hexdigest()[:10]

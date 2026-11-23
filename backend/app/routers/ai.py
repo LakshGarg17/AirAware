@@ -70,13 +70,10 @@ async def chat_with_assistant(payload: ChatRequest, request: Request, response: 
     # 1. Rate limiting per IP
     client_ip = request.client.host if request.client else "127.0.0.1"
     if not ai_service.check_rate_limit(client_ip):
-        response.headers["Retry-After"] = "60"
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail={
-                "code": "RATE_LIMITED",
-                "message": "Chat rate limit exceeded. Please wait 60 seconds before sending another message."
-            }
+            detail="Chat rate limit exceeded. Please wait 60 seconds before sending another message.",
+            headers={"Retry-After": "60"}
         )
 
     # 2. Server-side context derivation (never trust client-sent AQI)

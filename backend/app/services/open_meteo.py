@@ -2,9 +2,13 @@
 Async Open-Meteo API Client Service.
 Fetches real-time Air Quality, Weather Forecast, and Geocoding data.
 Complies with Open-Meteo free tier requirements (CC BY 4.0, non-commercial use).
+Includes in-memory TTL caching, transient error retries, and friendly rate-limit handling.
 """
+import asyncio
 import logging
-from typing import Any, Dict, List, Optional
+import time
+from typing import Any, Dict, List, Optional, Tuple
+from fastapi import HTTPException
 import httpx
 
 from app.config import settings
@@ -50,64 +54,99 @@ POLLUTANT_CONFIG = [
 
 
 class OpenMeteoService:
+    _shared_client: Optional[httpx.AsyncClient] = None
+    _cache: Dict[str, Tuple[float, Any]] = {}
+    _cache_ttl_seconds: int = 900  # 15 minutes default
+
     def __init__(self, client: Optional[httpx.AsyncClient] = None):
         self._client = client
 
-    async def _get_client(self) -> httpx.AsyncClient:
-        if self._client:
-            return self._client
-        return httpx.AsyncClient(timeout=TIMEOUT_SECONDS)
+    @classmethod
+    def get_shared_client(cls) -> httpx.AsyncClient:
+        """Returns or creates a shared persistent httpx client."""
+        if cls._shared_client is None or cls._shared_client.is_closed:
+            cls._shared_client = httpx.AsyncClient(timeout=TIMEOUT_SECONDS)
+        return cls._shared_client
+
+    @classmethod
+    def clear_cache(cls):
+        """Resets in-memory cache (primarily for tests)."""
+        cls._cache.clear()
+
+    async def _fetch_with_retry_and_cache(
+        self,
+        url: str,
+        params: Dict[str, Any],
+        cache_key: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Executes HTTP GET with in-memory TTL caching and a single retry on transient failures.
+        """
+        now = time.time()
+        # 1. Check TTL cache
+        if cache_key and cache_key in self._cache:
+            ts, val = self._cache[cache_key]
+            if now - ts < self._cache_ttl_seconds:
+                return val
+
+        client = self._client or self.get_shared_client()
+        attempts = 2  # 1 initial attempt + 1 transient retry
+        last_exc: Optional[Exception] = None
+
+        for attempt in range(attempts):
+            try:
+                response = await client.get(url, params=params)
+                if response.status_code == 429:
+                    raise HTTPException(
+                        status_code=503,
+                        detail="Upstream environmental data provider is temporarily rate limited. Please try again in a few moments."
+                    )
+                response.raise_for_status()
+                data = response.json()
+                if cache_key:
+                    self._cache[cache_key] = (now, data)
+                return data
+            except (httpx.ConnectTimeout, httpx.ConnectError) as exc:
+                last_exc = exc
+                if attempt == attempts - 1:
+                    logger.error(f"Open-Meteo transient error after {attempts} attempts: {exc}")
+                    raise
+                await asyncio.sleep(0.5)
+            except httpx.HTTPError:
+                raise
+
+        if last_exc:
+            raise last_exc
+        return {}
 
     async def get_air_quality(self, lat: float, lon: float) -> Dict[str, Any]:
         """
         Fetches air quality data from Open-Meteo Air Quality API.
         """
         params = {
-            "latitude": lat,
-            "longitude": lon,
+            "latitude": round(lat, 4),
+            "longitude": round(lon, 4),
             "current": "us_aqi,european_aqi,pm10,pm2_5,carbon_monoxide,nitrogen_dioxide,sulphur_dioxide,ozone",
             "hourly": "us_aqi,pm2_5",
             "past_days": 2,
             "forecast_days": 2,
             "timezone": "auto"
         }
-
-        should_close = self._client is None
-        client = await self._get_client()
-        try:
-            response = await client.get(settings.open_meteo_aq_url, params=params)
-            response.raise_for_status()
-            return response.json()
-        except httpx.HTTPError as exc:
-            logger.error(f"Open-Meteo Air Quality API error: {exc}")
-            raise
-        finally:
-            if should_close:
-                await client.aclose()
+        cache_key = f"aq_{round(lat, 4)}_{round(lon, 4)}"
+        return await self._fetch_with_retry_and_cache(settings.open_meteo_aq_url, params, cache_key)
 
     async def get_weather(self, lat: float, lon: float) -> Dict[str, Any]:
         """
         Fetches current weather from Open-Meteo Forecast API.
         """
         params = {
-            "latitude": lat,
-            "longitude": lon,
+            "latitude": round(lat, 4),
+            "longitude": round(lon, 4),
             "current": "temperature_2m,relative_humidity_2m,apparent_temperature,wind_speed_10m,wind_direction_10m,precipitation,weather_code,is_day",
             "timezone": "auto"
         }
-
-        should_close = self._client is None
-        client = await self._get_client()
-        try:
-            response = await client.get(settings.open_meteo_weather_url, params=params)
-            response.raise_for_status()
-            return response.json()
-        except httpx.HTTPError as exc:
-            logger.error(f"Open-Meteo Weather API error: {exc}")
-            raise
-        finally:
-            if should_close:
-                await client.aclose()
+        cache_key = f"weather_{round(lat, 4)}_{round(lon, 4)}"
+        return await self._fetch_with_retry_and_cache(settings.open_meteo_weather_url, params, cache_key)
 
     async def search_locations(self, query: str, count: int = 5) -> List[Dict[str, Any]]:
         """
@@ -123,24 +162,12 @@ class OpenMeteoService:
             "language": "en",
             "format": "json"
         }
-
-        should_close = self._client is None
-        client = await self._get_client()
-        try:
-            response = await client.get(settings.open_meteo_geocoding_url, params=params)
-            response.raise_for_status()
-            data = response.json()
-            # The 'results' key is ABSENT when nothing is found
-            results = data.get("results")
-            if results is None:
-                return []
-            return results
-        except httpx.HTTPError as exc:
-            logger.error(f"Open-Meteo Geocoding API error: {exc}")
-            raise
-        finally:
-            if should_close:
-                await client.aclose()
+        cache_key = f"geo_{query.strip().lower()}_{count}"
+        data = await self._fetch_with_retry_and_cache(settings.open_meteo_geocoding_url, params, cache_key)
+        results = data.get("results")
+        if results is None:
+            return []
+        return results
 
     def process_air_quality_and_weather(
         self,
@@ -187,7 +214,7 @@ class OpenMeteoService:
                     "description": p_cfg["desc"]
                 })
 
-        # 3. Weather formatting
+        # 3. Weather formatting (gracefully handles partial failure where weather is empty)
         w_code = current_weather.get("weather_code")
         is_day = current_weather.get("is_day", 1)
         weather_cond = get_weather_condition(w_code, is_day)
@@ -222,7 +249,6 @@ class OpenMeteoService:
             aqi_val = us_aqis[idx] if idx < len(us_aqis) else None
             pm25_val = pm25s[idx] if idx < len(pm25s) else None
 
-            # Timestamp parsing
             try:
                 dt = datetime.datetime.fromisoformat(t_str)
                 ts = int(dt.timestamp())
