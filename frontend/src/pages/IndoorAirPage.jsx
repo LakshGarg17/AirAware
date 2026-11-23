@@ -3,6 +3,7 @@ import {
   Home, CheckCircle2, AlertOctagon, DollarSign, Wrench, 
   Sparkles, ShieldCheck, Filter, Loader2, Info 
 } from 'lucide-react';
+import { fetchIndoorTips } from '../api/client';
 
 export default function IndoorAirPage({ aqiData }) {
   const [tipsData, setTipsData] = useState(null);
@@ -16,13 +17,8 @@ export default function IndoorAirPage({ aqiData }) {
     async function loadTips() {
       setIsLoading(true);
       try {
-        const params = new URLSearchParams();
-        if (aqiVal !== null && aqiVal !== undefined) params.append('aqi', aqiVal);
-        const res = await fetch(`/api/indoor/tips?${params.toString()}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (isMounted) setTipsData(data);
-        }
+        const data = await fetchIndoorTips(aqiVal);
+        if (isMounted) setTipsData(data);
       } catch (err) {
         console.error("Failed to fetch indoor tips:", err);
       } finally {

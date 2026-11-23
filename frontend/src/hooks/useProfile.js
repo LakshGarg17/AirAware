@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { storage } from '../storage/localStorageAdapter';
+import { validateProfile } from '../api/client';
 
 export function useProfile() {
   const [profile, setProfile] = useState(() => storage.getProfile());
@@ -13,18 +14,11 @@ export function useProfile() {
     // Call backend stateless validate endpoint
     setIsValidating(true);
     try {
-      const res = await fetch('/api/profile/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newProfile)
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setWarnings(data.warnings || []);
-        if (data.profile) {
-          setProfile(data.profile);
-          storage.saveProfile(data.profile);
-        }
+      const data = await validateProfile(newProfile);
+      setWarnings(data.warnings || []);
+      if (data.profile) {
+        setProfile(data.profile);
+        storage.saveProfile(data.profile);
       }
     } catch (err) {
       console.warn("Backend profile validation unavailable:", err);

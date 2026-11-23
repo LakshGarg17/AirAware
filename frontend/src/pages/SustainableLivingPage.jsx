@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Leaf, ArrowRight, ShieldCheck, Heart, Sparkles, Loader2 } from 'lucide-react';
+import { fetchSustainableRecommendations } from '../api/client';
 
 export default function SustainableLivingPage({ profile }) {
   const [data, setData] = useState(null);
@@ -11,15 +12,8 @@ export default function SustainableLivingPage({ profile }) {
     async function loadData() {
       setIsLoading(true);
       try {
-        const res = await fetch('/api/sustainable/recommendations', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(profile || {})
-        });
-        if (res.ok) {
-          const resData = await res.json();
-          if (isMounted) setData(resData);
-        }
+        const resData = await fetchSustainableRecommendations(profile);
+        if (isMounted) setData(resData);
       } catch (err) {
         console.error("Failed to load sustainable recommendations:", err);
       } finally {

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { storage } from '../storage/localStorageAdapter';
+import { generateDailyPlan } from '../api/client';
 
 export function usePlan(latitude, longitude, profile) {
   const [planData, setPlanData] = useState(null);
@@ -15,20 +16,7 @@ export function usePlan(latitude, longitude, profile) {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/plan/daily', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          latitude,
-          longitude,
-          profile,
-          variation: varOffset
-        })
-      });
-      if (!res.ok) {
-        throw new Error(`Planner request failed: ${res.status}`);
-      }
-      const data = await res.json();
+      const data = await generateDailyPlan(latitude, longitude, profile, varOffset);
       setPlanData(data);
     } catch (err) {
       console.error("Failed to load daily plan:", err);
@@ -61,7 +49,7 @@ export function usePlan(latitude, longitude, profile) {
       ...planData.periods.afternoon,
       ...planData.periods.evening,
       ...planData.periods.night
-    ].map(p => p.id);
+    ].map(a => a.id);
     return allPlanIds.includes(id);
   }).length;
 
@@ -72,8 +60,8 @@ export function usePlan(latitude, longitude, profile) {
     completedIds,
     toggleAction,
     regenerate,
-    completedCount,
     totalActions,
-    todayStr
+    completedCount,
+    reload: () => loadPlan(variation)
   };
 }

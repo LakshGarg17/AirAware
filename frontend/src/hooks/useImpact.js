@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { storage } from '../storage/localStorageAdapter';
+import { fetchImpactCatalog, fetchImpactSummary } from '../api/client';
 
 export function useImpact() {
   const [actions, setActions] = useState(() => storage.getImpactActions());
@@ -18,11 +19,8 @@ export function useImpact() {
     let isMounted = true;
     async function loadCatalog() {
       try {
-        const res = await fetch('/api/impact/catalog');
-        if (res.ok) {
-          const data = await res.json();
-          if (isMounted) setCatalog(data);
-        }
+        const data = await fetchImpactCatalog();
+        if (isMounted) setCatalog(data);
       } catch (err) {
         console.warn("Failed to load impact catalog:", err);
       }
@@ -35,18 +33,8 @@ export function useImpact() {
   const fetchSummary = useCallback(async (currentActions) => {
     setIsLoading(true);
     try {
-      const res = await fetch('/api/impact/summary', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          actions: currentActions,
-          timezone: timezone || 'UTC'
-        })
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setSummary(data);
-      }
+      const data = await fetchImpactSummary(currentActions, timezone || 'UTC');
+      setSummary(data);
     } catch (err) {
       console.warn("Failed to fetch impact summary:", err);
     } finally {
@@ -68,43 +56,47 @@ export function useImpact() {
       type,
       category,
       timestamp: new Date().toISOString(),
-      note: note.slice(0, 140)
+      note: note.trim().slice(0, 140)
     };
 
-    const res = storage.logImpactAction(newAction);
-    if (!res.success && res.reason === 'double_tap') {
-      setToastMessage("Action was recently logged (anti-double-tap safeguard active).");
-      setTimeout(() => setToastMessage(null), 3000);
-      return false;
-    }
+    const updated = storage.saveImpactAction(newAction);
+    setActions(updated);
 
-    setActions(res.actions);
-    setToastMessage(`Logged: ${actDef ? actDef.label : type}`);
+    const actionLabel = actDef ? actDef.label : "Action";
+    setToastMessage(`Logged: ${actionLabel}`);
     setTimeout(() => setToastMessage(null), 3000);
-    return true;
   };
 
-  // Delete action
+  // Delete single action with undo
   const deleteAction = (actionId) => {
-    const target = actions.find(a => a.id === actionId);
-    if (target) {
-      setLastDeleted(target);
-      const updated = storage.deleteImpactAction(actionId);
-      setActions(updated);
-      setToastMessage("Action removed. Click Undo to restore.");
-      setTimeout(() => setToastMessage(null), 4000);
-    }
+    const actionToDelete = actions.find(a => a.id === actionId);
+    if (!actionToDelete) return;
+
+    setLastDeleted(actionToDelete);
+    const updated = storage.deleteImpactAction(actionId);
+    setActions(updated);
+
+    setToastMessage("Action removed.");
+    setTimeout(() => setToastMessage(null), 4000);
   };
 
   // Undo delete
   const undoDelete = () => {
-    if (lastDeleted) {
-      const updated = storage.restoreImpactAction(lastDeleted);
-      setActions(updated);
-      setLastDeleted(null);
-      setToastMessage("Action restored successfully.");
-      setTimeout(() => setToastMessage(null), 3000);
-    }
+    if (!lastDeleted) return;
+    const updated = storage.saveImpactAction(lastDeleted);
+    setActions(updated);
+    setLastDeleted(null);
+    setToastMessage("Action restored.");
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  // Reset all actions
+  const resetAllActions = () => {
+    storage.setItem('airaware_impact_actions_v1', []);
+    setActions([]);
+    setSummary(null);
+    setToastMessage("All logged actions deleted.");
+    setTimeout(() => setToastMessage(null), 3000);
   };
 
   return {
@@ -116,6 +108,7 @@ export function useImpact() {
     deleteAction,
     undoDelete,
     lastDeleted,
+    resetAllActions,
     toastMessage
   };
 }

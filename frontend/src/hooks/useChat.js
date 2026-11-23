@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { sendChatMessage } from '../api/client';
 
 const INITIAL_STARTER_QUESTIONS = [
   "Should I wear an N95 mask or surgical mask today?",
@@ -52,69 +53,62 @@ export function useChat(latitude, longitude, city, profile) {
     }, 35000);
 
     try {
-      const res = await fetch('/api/ai/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: cleanText,
-          history: historyPayload,
-          latitude: latitude || 28.6139,
-          longitude: longitude || 77.2090,
-          city: city || 'Delhi, India',
-          profile
-        }),
-        signal: abortCtrl.signal
-      });
+      const data = await sendChatMessage({
+        message: cleanText,
+        history: historyPayload,
+        latitude: latitude || 28.6139,
+        longitude: longitude || 77.2090,
+        city: city || 'Delhi, India',
+        profile
+      }, abortCtrl.signal);
 
       clearTimeout(timeoutId);
 
-      if (!res.ok) {
-        if (res.status === 429) {
-          throw new Error("Chat rate limit exceeded. Please wait a minute before sending another question.");
-        }
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.detail || `Server error (${res.status})`);
-      }
-
-      const data = await res.json();
       const assistantMessage = {
-        id: `msg_ast_${Date.now()}`,
+        id: `msg_assistant_${Date.now()}`,
         role: 'assistant',
         content: data.reply,
         source: data.source, // 'ai' or 'rules'
-        fallback_reason: data.fallback_reason,
-        suggested_followups: data.suggested_followups || [],
-        context_used: data.context_used,
+        fallbackReason: data.fallback_reason,
+        suggestedFollowups: data.suggested_followups || [],
+        contextUsed: data.context_used,
         timestamp: new Date().toISOString()
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
     } catch (err) {
       if (err.name === 'AbortError') {
-        setError("Request timed out (server warming up). Please click Retry.");
+        setError("Request timed out or was cancelled. Server may be warming up—please retry.");
       } else {
-        setError(err.message || "Failed to reach clean air assistant.");
+        setError(err.message || "Failed to reach clean air assistant. Please check connection.");
       }
     } finally {
       setIsLoading(false);
-      clearTimeout(timeoutId);
     }
-  }, [latitude, longitude, city, profile, messages, isLoading]);
+  }, [isLoading, messages, latitude, longitude, city, profile]);
 
-  const clearChat = () => {
+  const clearChat = useCallback(() => {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
     }
     setMessages([]);
     setError(null);
-  };
+  }, []);
 
-  const retryLast = () => {
-    const lastUserMsg = [...messages].reverse().find(m => m.role === 'user');
+  const retryLast = useCallback(() => {
+    const lastUserMsg = [...messages].reverse().find((m) => m.role === 'user');
     if (lastUserMsg) {
       sendMessage(lastUserMsg.content);
     }
-  };
+  }, [messages, sendMessage]);
+
+  useEffect(() => {
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, []);
 
   return {
     messages,
